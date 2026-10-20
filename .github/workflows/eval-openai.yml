@@ -1,0 +1,48 @@
+name: eval-openai
+# Real-model evaluation: nightly, on demand, and on PRs labelled "run-llm-eval".
+# Requires repository secret OPENAI_API_KEY (and optionally LANGSMITH_API_KEY).
+on:
+  schedule:
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  eval:
+    if: github.event_name != 'pull_request' || github.event.label.name == 'run-llm-eval'
+    runs-on: ubuntu-latest
+    env:
+      INSIGHTLY_LLM_PROVIDER: openai
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_TRACING: ${{ secrets.LANGSMITH_API_KEY != '' }}
+      LANGSMITH_PROJECT: insightly-ci
+      INSIGHTLY_REQUEST_BUDGET_USD: "0.10"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {python-version: "3.12", enable-cache: true}
+      - run: uv sync --frozen
+      - run: uv run insightly data synthetic --users 3000 && uv run insightly data curate
+      - name: Restore last accepted baseline report
+        uses: actions/cache/restore@v4
+        with: {path: baseline, key: eval-baseline-${{ github.run_id }}, restore-keys: eval-baseline-}
+      - run: uv run insightly eval run
+      - name: Gate (thresholds + regression vs baseline)
+        run: |
+          if [ -f baseline/summary.json ]; then
+            uv run insightly eval gate --baseline baseline
+          else
+            uv run insightly eval gate
+          fi
+      - run: uv run insightly cost report --questions-per-day 500
+      - name: Promote this run to baseline (main only)
+        if: github.ref == 'refs/heads/main'
+        run: rm -rf baseline && cp -rL reports/eval/latest baseline
+      - uses: actions/cache/save@v4
+        if: github.ref == 'refs/heads/main'
+        with: {path: baseline, key: eval-baseline-${{ github.run_id }}}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: openai-eval-report, path: reports/eval/}

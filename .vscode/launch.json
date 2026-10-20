@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API (uvicorn, reload)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["insightly.api.main:app", "--reload", "--port", "8000"],
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false
+    },
+    {
+      "name": "Ask one question (CLI)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "insightly.cli",
+      "args": ["ask", "Net revenue by category group in 2023"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Evaluation run",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "insightly.cli",
+      "args": ["eval", "run"],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Streamlit UI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": ["run", "ui/streamlit_app.py"]
+    }
+  ]
+}

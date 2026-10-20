@@ -1,0 +1,31 @@
+# USD per 1M tokens. Source: OpenAI model pages (developers.openai.com/api/docs/models),
+# checked 2026-10-20. Prices change: re-check before quoting numbers and update this file.
+# cached_input applies to prompt-cache hits (automatic for prompts >= 1024 tokens).
+models:
+  gpt-5.4:
+    input: 2.50
+    cached_input: 0.25
+    output: 15.00
+  gpt-5.4-mini:
+    input: 0.75
+    cached_input: 0.075
+    output: 4.50
+  gpt-5.4-nano:
+    input: 0.20
+    cached_input: 0.02
+    output: 1.25
+  text-embedding-3-small:
+    input: 0.02
+    cached_input: 0.02
+    output: 0.0
+  text-embedding-3-large:
+    input: 0.13
+    cached_input: 0.13
+    output: 0.0
+# Fine-tuned models are billed at their own rates; add them here once a job finishes, e.g.
+#  ft:<base-model>:<org>:insightly-sql:<id>: {input: <usd>, cached_input: <usd>, output: <usd>}
+default:
+  input: 2.50
+  cached_input: 0.25
+  output: 15.00
+athena_usd_per_tb_scanned: 5.0
