@@ -37,7 +37,7 @@ def _norm_q(q: str) -> str:
 
 
 def _golden_questions() -> set[str]:
-    return {_norm_q(c["question"]) for c in yaml.safe_load(GOLDEN.read_text())["cases"]}
+    return {_norm_q(c["question"]) for c in yaml.safe_load(GOLDEN.read_text(encoding="utf-8"))["cases"]}
 
 
 def _too_close(q: str, golden: set[str]) -> bool:
@@ -67,7 +67,7 @@ def collect(feedback_path: Path | None) -> list[dict]:
     pairs: list[dict] = []
     fp = feedback_path or get_settings().feedback_path
     if fp.exists():
-        for line in fp.read_text().splitlines():
+        for line in fp.read_text(encoding="utf-8").splitlines():
             rec = json.loads(line)
             if rec.get("corrected_sql"):
                 pairs.append(
@@ -116,7 +116,7 @@ def build(
     OUT.mkdir(parents=True, exist_ok=True)
     system = prompts.sql_system()
     for split, items in splits.items():
-        with (OUT / f"sql_sft_{split}.jsonl").open("w") as f:
+        with (OUT / f"sql_sft_{split}.jsonl").open("w", encoding="utf-8") as f:
             for r in items:
                 target = SQLDraft(sql=r["sql"], tables_used=r["tables"], metric_ids=[], assumptions=[])
                 f.write(
@@ -131,7 +131,7 @@ def build(
                     )
                     + "\n"
                 )
-        with (OUT / f"sql_rft_{split}.jsonl").open("w") as f:
+        with (OUT / f"sql_rft_{split}.jsonl").open("w", encoding="utf-8") as f:
             for r in items:
                 f.write(
                     json.dumps(

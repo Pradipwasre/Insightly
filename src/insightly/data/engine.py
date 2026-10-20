@@ -57,7 +57,7 @@ class DuckDBEngine:
         s = get_settings()
         self.conn = duckdb.connect(database=":memory:")
         for t in [*AGENT_TABLES, *RESTRICTED_TABLES]:
-            path = s.curated_dir / t / "*.parquet"
+            path = (s.curated_dir / t / "*.parquet").as_posix()
             self.conn.execute(f"CREATE OR REPLACE VIEW {t} AS SELECT * FROM read_parquet('{path}')")
 
     def execute(self, sql: str, max_rows: int | None = None) -> QueryResult:

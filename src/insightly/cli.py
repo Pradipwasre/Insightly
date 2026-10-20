@@ -110,7 +110,7 @@ def eval_run(judge: bool = False, limit: int = typer.Option(None), tag: str = ty
     from insightly.eval.runner import run
 
     out = run(judge=judge, limit=limit, tag=tag)
-    m = json.loads((out / "summary.json").read_text())["metrics"]
+    m = json.loads((out / "summary.json").read_text(encoding="utf-8"))["metrics"]
     t = Table("metric", "value")
     for k, v in m.items():
         if k != "intent_confusion":

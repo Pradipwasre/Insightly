@@ -84,9 +84,9 @@ class SemanticLayer:
 @lru_cache
 def load_semantic_layer(path: Path | None = None) -> SemanticLayer:
     path = Path(path or get_settings().semantic_dir)
-    t = yaml.safe_load((path / "tables.yaml").read_text())
-    m = yaml.safe_load((path / "metrics.yaml").read_text())
-    e = yaml.safe_load((path / "examples.yaml").read_text())
+    t = yaml.safe_load((path / "tables.yaml").read_text(encoding="utf-8"))
+    m = yaml.safe_load((path / "metrics.yaml").read_text(encoding="utf-8"))
+    e = yaml.safe_load((path / "examples.yaml").read_text(encoding="utf-8"))
     digest = hashlib.sha256(json.dumps([t, m, e], sort_keys=True, default=str).encode()).hexdigest()[:12]
     return SemanticLayer(
         tables={x["name"]: x for x in t["tables"]},

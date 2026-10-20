@@ -99,14 +99,14 @@ def write_markdown(out_dir: Path, meta: dict, summary: dict, results, redteam) -
     lines += [
         f"| {x['id']} | {x['category']} | {x['status']} | {x['blocked']} | {x['leaked']} |" for x in redteam
     ]
-    (out_dir / "report.md").write_text("\n".join(lines) + "\n")
+    (out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def gate(report_dir: Path, baseline_dir: Path | None = None) -> list[str]:
     """Return a list of violations (empty list = pass)."""
-    data = json.loads((report_dir / "summary.json").read_text())
+    data = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
     m, provider = data["metrics"], data["meta"]["provider"]
-    th = yaml.safe_load((ROOT_DIR / "evals" / "thresholds.yaml").read_text())
+    th = yaml.safe_load((ROOT_DIR / "evals" / "thresholds.yaml").read_text(encoding="utf-8"))
     rules = th.get(provider, {})
     bad = []
     for k, lo in (rules.get("min") or {}).items():
@@ -116,7 +116,7 @@ def gate(report_dir: Path, baseline_dir: Path | None = None) -> list[str]:
         if m.get(k) is not None and m[k] > hi:
             bad.append(f"{k}={m[k]} > max {hi}")
     if baseline_dir and (baseline_dir / "summary.json").exists():
-        base = json.loads((baseline_dir / "summary.json").read_text())["metrics"]
+        base = json.loads((baseline_dir / "summary.json").read_text(encoding="utf-8"))["metrics"]
         reg = th.get("regression", {})
         for k, drop in reg.items():
             if k.endswith("_rel"):

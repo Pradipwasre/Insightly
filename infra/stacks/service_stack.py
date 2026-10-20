@@ -87,7 +87,16 @@ class ServiceStack(cdk.Stack):
                 image=ecs.ContainerImage.from_asset(
                     REPO_ROOT,
                     platform=ecr_assets.Platform.LINUX_ARM64,
-                    exclude=["infra/cdk.out", ".venv", "data", "reports"],
+                    exclude=[
+                        "infra/cdk.out",
+                        ".venv",
+                        ".git",
+                        ".cache",
+                        "data",
+                        "reports",
+                        "**/__pycache__",
+                        "**/node_modules",
+                    ],
                 ),
                 container_port=8000,
                 environment=env,

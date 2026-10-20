@@ -106,7 +106,7 @@ def feedback(req: FeedbackRequest, user: User = Depends(current_user)) -> dict:
     s = get_settings()
     record = {**req.model_dump(), "user_id": user.id, "ts": datetime.now(UTC).isoformat()}
     s.feedback_path.parent.mkdir(parents=True, exist_ok=True)
-    with s.feedback_path.open("a") as f:
+    with s.feedback_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
     log.info("feedback", rating=req.rating, has_correction=bool(req.corrected_sql))
     return {"stored": True}

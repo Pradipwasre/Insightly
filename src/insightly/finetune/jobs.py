@@ -80,7 +80,7 @@ def submit(method: str, base_model: str | None, dry_run: bool = False) -> dict:
         "method": method_cfg["type"],
         "train": str(train),
         "val": str(val),
-        "train_rows": sum(1 for _ in train.open()),
+        "train_rows": sum(1 for _ in train.open(encoding="utf-8")),
     }
     if dry_run:
         return {"dry_run": True, **plan}

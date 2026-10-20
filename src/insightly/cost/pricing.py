@@ -51,7 +51,7 @@ class PriceBook:
 @lru_cache
 def load_pricebook(path: Path | None = None) -> PriceBook:
     path = path or get_settings().pricing_file
-    raw = yaml.safe_load(Path(path).read_text())
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     models = {name: Price(**vals) for name, vals in raw["models"].items()}
     return PriceBook(
         models=models,

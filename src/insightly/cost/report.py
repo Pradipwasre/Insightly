@@ -8,8 +8,12 @@ from pathlib import Path
 
 
 def projection(report_dir: Path, questions_per_day: int) -> dict:
-    cases = [json.loads(line) for line in (report_dir / "cases.jsonl").read_text().splitlines() if line]
-    meta = json.loads((report_dir / "summary.json").read_text())["meta"]
+    cases = [
+        json.loads(line)
+        for line in (report_dir / "cases.jsonl").read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    meta = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))["meta"]
     n = len(cases) or 1
     per_q = sum(c["cost_usd"] for c in cases) / n
     by_status: dict[str, list[float]] = defaultdict(list)

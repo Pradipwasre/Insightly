@@ -18,7 +18,7 @@ DATASET = "insightly-golden-v1"
 
 
 def sync_dataset(client: Client) -> str:
-    cases = [c for c in yaml.safe_load(GOLDEN.read_text())["cases"]]
+    cases = [c for c in yaml.safe_load(GOLDEN.read_text(encoding="utf-8"))["cases"]]
     if client.has_dataset(dataset_name=DATASET):
         return DATASET
     ds = client.create_dataset(DATASET, description="Insightly golden questions (analyst verified)")

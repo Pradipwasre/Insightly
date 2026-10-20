@@ -70,7 +70,7 @@ class CachedEmbedder:
         self.path = cache_path or get_settings().embedding_cache
         self._cache: dict[str, list[float]] = {}
         if self.path.exists():
-            self._cache = json.loads(self.path.read_text())
+            self._cache = json.loads(self.path.read_text(encoding="utf-8"))
         self.misses = 0
 
     def _key(self, text: str) -> str:
@@ -83,7 +83,7 @@ class CachedEmbedder:
             for t, v in zip(missing, self.inner.embed(missing), strict=True):
                 self._cache[self._key(t)] = v
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps(self._cache))
+            self.path.write_text(json.dumps(self._cache), encoding="utf-8")
         return [self._cache[self._key(t)] for t in texts]
 
     def embed_query(self, text: str) -> list[float]:

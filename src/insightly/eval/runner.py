@@ -11,6 +11,7 @@ the same engine, so execution accuracy compares real result sets.
 from __future__ import annotations
 
 import json
+import shutil
 import statistics
 import time
 from dataclasses import asdict, dataclass, field
@@ -163,7 +164,7 @@ def _judge_ledger():
 
 
 def run_redteam() -> list[dict]:
-    cases = yaml.safe_load(REDTEAM.read_text())["cases"]
+    cases = yaml.safe_load(REDTEAM.read_text(encoding="utf-8"))["cases"]
     out = []
     for c in cases:
         res = _ask(c["question"])
@@ -258,7 +259,7 @@ def summarize(results: list[CaseResult], redteam: list[dict]) -> dict[str, Any]:
 
 def run(judge: bool = False, limit: int | None = None, tag: str | None = None) -> Path:
     s = get_settings()
-    cases = yaml.safe_load(GOLDEN.read_text())["cases"]
+    cases = yaml.safe_load(GOLDEN.read_text(encoding="utf-8"))["cases"]
     if tag:
         cases = [c for c in cases if tag in c.get("tags", [])]
     cases = cases[:limit] if limit else cases
@@ -281,14 +282,22 @@ def run(judge: bool = False, limit: int | None = None, tag: str | None = None) -
         "golden": GOLDEN.name,
         "timestamp": stamp,
     }
-    (out_dir / "summary.json").write_text(json.dumps({"meta": meta, "metrics": summary}, indent=2))
-    (out_dir / "cases.jsonl").write_text("\n".join(json.dumps(asdict(r)) for r in results))
-    (out_dir / "redteam.jsonl").write_text("\n".join(json.dumps(x) for x in redteam))
+    (out_dir / "summary.json").write_text(
+        json.dumps({"meta": meta, "metrics": summary}, indent=2), encoding="utf-8"
+    )
+    (out_dir / "cases.jsonl").write_text("\n".join(json.dumps(asdict(r)) for r in results), encoding="utf-8")
+    (out_dir / "redteam.jsonl").write_text("\n".join(json.dumps(x) for x in redteam), encoding="utf-8")
     from insightly.eval.report import write_markdown
 
     write_markdown(out_dir, meta, summary, results, redteam)
     latest = REPORTS / "latest"
-    if latest.is_symlink() or latest.exists():
+    if latest.is_symlink() or latest.is_file():
         latest.unlink()
-    latest.symlink_to(out_dir.name)
+    elif latest.is_dir():
+        shutil.rmtree(latest)
+    try:
+        latest.symlink_to(out_dir.name, target_is_directory=True)
+    except OSError:
+        # Windows without Developer Mode cannot create symlinks: keep a copy instead.
+        shutil.copytree(out_dir, latest)
     return out_dir
