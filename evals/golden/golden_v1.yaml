@@ -1,0 +1,351 @@
+# Golden evaluation set v1. Reference SQL is Trino/Athena dialect and verified by an analyst.
+# Never copy these questions into semantic_layer/examples.yaml (that would leak the test set).
+# Fields: id, question, intent, difficulty (easy|medium|hard), tags, expected_tables,
+#         expected_metric (optional), reference_sql (analytics only), wants_chart (optional)
+version: 1
+cases:
+  - id: g001
+    question: How many orders were placed in 2023?
+    intent: analytics
+    difficulty: easy
+    tags: [orders, time-filter]
+    expected_tables: [orders]
+    expected_metric: order_count
+    reference_sql: |
+      SELECT COUNT(DISTINCT o.order_id) AS orders FROM orders AS o
+      WHERE o.created_at >= TIMESTAMP '2023-01-01 00:00:00' AND o.created_at < TIMESTAMP '2024-01-01 00:00:00'
+  - id: g002
+    question: What is the overall return rate?
+    intent: analytics
+    difficulty: easy
+    tags: [returns, metric]
+    expected_tables: [orders]
+    expected_metric: return_rate
+    reference_sql: |
+      SELECT 100.0 * COUNT_IF(o.status = 'Returned') / NULLIF(COUNT(*), 0) AS return_rate_pct FROM orders AS o
+  - id: g003
+    question: Total net revenue across all time
+    intent: analytics
+    difficulty: easy
+    tags: [revenue, metric]
+    expected_tables: [order_items]
+    expected_metric: net_revenue
+    reference_sql: |
+      SELECT SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END) AS net_revenue
+      FROM order_items AS oi
+  - id: g004
+    question: Net revenue by product category group in 2023
+    intent: analytics
+    difficulty: medium
+    tags: [revenue, join, time-filter]
+    expected_tables: [order_items, products]
+    expected_metric: net_revenue
+    reference_sql: |
+      SELECT p.category_group,
+             SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END) AS net_revenue
+      FROM order_items AS oi JOIN products AS p ON oi.product_id = p.id
+      WHERE oi.created_at >= TIMESTAMP '2023-01-01 00:00:00' AND oi.created_at < TIMESTAMP '2024-01-01 00:00:00'
+      GROUP BY p.category_group
+  - id: g005
+    question: Plot monthly net revenue for 2022
+    intent: analytics
+    difficulty: medium
+    tags: [revenue, time-series, chart]
+    wants_chart: true
+    expected_tables: [order_items]
+    expected_metric: net_revenue
+    reference_sql: |
+      SELECT date_trunc('month', oi.created_at) AS month,
+             SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END) AS net_revenue
+      FROM order_items AS oi
+      WHERE oi.created_at >= TIMESTAMP '2022-01-01 00:00:00' AND oi.created_at < TIMESTAMP '2023-01-01 00:00:00'
+      GROUP BY 1
+  - id: g006
+    question: Which 3 product categories have the highest gross profit?
+    intent: analytics
+    difficulty: hard
+    tags: [profit, join, ranking]
+    expected_tables: [order_items, inventory_items, products]
+    expected_metric: gross_profit
+    reference_sql: |
+      SELECT p.category_group,
+             SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price - ii.cost ELSE 0 END) AS gross_profit
+      FROM order_items AS oi
+      JOIN inventory_items AS ii ON oi.inventory_item_id = ii.id
+      JOIN products AS p ON oi.product_id = p.id
+      GROUP BY p.category_group ORDER BY gross_profit DESC LIMIT 3
+  - id: g007
+    question: Gross margin percentage by department
+    intent: analytics
+    difficulty: hard
+    tags: [margin, join]
+    expected_tables: [order_items, inventory_items, products]
+    expected_metric: gross_margin_pct
+    reference_sql: |
+      SELECT p.department,
+             100.0 * SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price - ii.cost ELSE 0 END)
+               / NULLIF(SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END), 0) AS gross_margin_pct
+      FROM order_items AS oi
+      JOIN inventory_items AS ii ON oi.inventory_item_id = ii.id
+      JOIN products AS p ON oi.product_id = p.id
+      GROUP BY p.department
+  - id: g008
+    question: Return rate by customer gender
+    intent: analytics
+    difficulty: easy
+    tags: [returns, metric]
+    expected_tables: [orders]
+    expected_metric: return_rate
+    reference_sql: |
+      SELECT o.gender, 100.0 * COUNT_IF(o.status = 'Returned') / NULLIF(COUNT(*), 0) AS return_rate_pct
+      FROM orders AS o GROUP BY o.gender
+  - id: g009
+    question: Average order value in 2023
+    intent: analytics
+    difficulty: medium
+    tags: [aov, time-filter]
+    expected_tables: [order_items]
+    expected_metric: average_order_value
+    reference_sql: |
+      SELECT SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END)
+               / NULLIF(COUNT(DISTINCT CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.order_id END), 0) AS aov
+      FROM order_items AS oi
+      WHERE oi.created_at >= TIMESTAMP '2023-01-01 00:00:00' AND oi.created_at < TIMESTAMP '2024-01-01 00:00:00'
+  - id: g010
+    question: How many customers do we have in each country?
+    intent: analytics
+    difficulty: easy
+    tags: [customers]
+    expected_tables: [users]
+    reference_sql: |
+      SELECT u.country, COUNT(*) AS customers FROM users AS u GROUP BY u.country
+  - id: g011
+    question: Average delivery time in days for each distribution center
+    intent: analytics
+    difficulty: hard
+    tags: [delivery, join]
+    expected_tables: [order_items, products, distribution_centers]
+    expected_metric: avg_delivery_days
+    reference_sql: |
+      SELECT dc.name AS distribution_center,
+             AVG(date_diff('hour', oi.created_at, oi.delivered_at)) / 24.0 AS avg_delivery_days
+      FROM order_items AS oi
+      JOIN products AS p ON oi.product_id = p.id
+      JOIN distribution_centers AS dc ON p.distribution_center_id = dc.id
+      WHERE oi.delivered_at IS NOT NULL
+      GROUP BY dc.name
+  - id: g012
+    question: What is the average delivery time in days for delivered orders?
+    intent: analytics
+    difficulty: easy
+    tags: [delivery, metric]
+    expected_tables: [orders]
+    expected_metric: avg_delivery_days
+    reference_sql: |
+      SELECT AVG(date_diff('hour', o.created_at, o.delivered_at)) / 24.0 AS avg_delivery_days
+      FROM orders AS o WHERE o.delivered_at IS NOT NULL
+  - id: g013
+    question: Session conversion rate by traffic channel
+    intent: analytics
+    difficulty: medium
+    tags: [funnel, events]
+    expected_tables: [events]
+    expected_metric: session_conversion_rate
+    reference_sql: |
+      SELECT e.channel,
+             100.0 * COUNT(DISTINCT CASE WHEN e.event_type = 'purchase' THEN e.session_id END)
+               / NULLIF(COUNT(DISTINCT CASE WHEN e.event_type = 'product' THEN e.session_id END), 0) AS conversion_rate_pct
+      FROM events AS e GROUP BY e.channel
+  - id: g014
+    question: Overall session conversion rate
+    intent: analytics
+    difficulty: easy
+    tags: [funnel, metric]
+    expected_tables: [events]
+    expected_metric: session_conversion_rate
+    reference_sql: |
+      SELECT 100.0 * COUNT(DISTINCT CASE WHEN e.event_type = 'purchase' THEN e.session_id END)
+               / NULLIF(COUNT(DISTINCT CASE WHEN e.event_type = 'product' THEN e.session_id END), 0) AS conversion_rate_pct
+      FROM events AS e
+  - id: g015
+    question: Sell-through rate by department
+    intent: analytics
+    difficulty: medium
+    tags: [inventory, metric, join]
+    expected_tables: [inventory_items, products]
+    expected_metric: sell_through_rate
+    reference_sql: |
+      SELECT p.department, 100.0 * COUNT(ii.sold_at) / NULLIF(COUNT(*), 0) AS sell_through_pct
+      FROM inventory_items AS ii JOIN products AS p ON ii.product_id = p.id
+      GROUP BY p.department
+  - id: g016
+    question: How many units are still unsold?
+    intent: analytics
+    difficulty: easy
+    tags: [inventory]
+    expected_tables: [inventory_items]
+    reference_sql: |
+      SELECT COUNT(*) AS unsold_units FROM inventory_items AS ii WHERE ii.sold_at IS NULL
+  - id: g017
+    question: Cancellation rate per year
+    intent: analytics
+    difficulty: medium
+    tags: [cancellations, time-series]
+    expected_tables: [orders]
+    expected_metric: cancellation_rate
+    reference_sql: |
+      SELECT year(o.created_at) AS year,
+             100.0 * COUNT_IF(o.status = 'Cancelled') / NULLIF(COUNT(*), 0) AS cancellation_rate_pct
+      FROM orders AS o GROUP BY 1
+  - id: g018
+    question: Number of active customers in 2022
+    intent: analytics
+    difficulty: easy
+    tags: [customers, time-filter]
+    expected_tables: [orders]
+    expected_metric: active_customers
+    reference_sql: |
+      SELECT COUNT(DISTINCT o.user_id) AS active_customers FROM orders AS o
+      WHERE o.created_at >= TIMESTAMP '2022-01-01 00:00:00' AND o.created_at < TIMESTAMP '2023-01-01 00:00:00'
+  - id: g019
+    question: Top 5 brands by net revenue
+    intent: analytics
+    difficulty: medium
+    tags: [revenue, ranking, join]
+    expected_tables: [order_items, products]
+    expected_metric: net_revenue
+    reference_sql: |
+      SELECT p.brand,
+             SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END) AS net_revenue
+      FROM order_items AS oi JOIN products AS p ON oi.product_id = p.id
+      GROUP BY p.brand ORDER BY net_revenue DESC LIMIT 5
+  - id: g020
+    question: New customer signups per year
+    intent: analytics
+    difficulty: easy
+    tags: [customers, time-series]
+    expected_tables: [users]
+    reference_sql: |
+      SELECT year(u.created_at) AS year, COUNT(*) AS signups FROM users AS u GROUP BY 1
+  - id: g021
+    question: Average customer age by traffic source
+    intent: analytics
+    difficulty: easy
+    tags: [customers]
+    expected_tables: [users]
+    reference_sql: |
+      SELECT u.traffic_source, AVG(u.age) AS avg_age FROM users AS u GROUP BY u.traffic_source
+  - id: g022
+    question: Net revenue by customer traffic source
+    intent: analytics
+    difficulty: medium
+    tags: [revenue, join, marketing]
+    expected_tables: [order_items, users]
+    expected_metric: net_revenue
+    reference_sql: |
+      SELECT u.traffic_source,
+             SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END) AS net_revenue
+      FROM order_items AS oi JOIN users AS u ON oi.user_id = u.id
+      GROUP BY u.traffic_source
+  - id: g023
+    question: Number of web events by browser
+    intent: analytics
+    difficulty: easy
+    tags: [events]
+    expected_tables: [events]
+    reference_sql: |
+      SELECT e.browser, COUNT(*) AS events FROM events AS e GROUP BY e.browser
+  - id: g024
+    question: How many orders are in each status in 2023?
+    intent: analytics
+    difficulty: easy
+    tags: [orders, time-filter]
+    expected_tables: [orders]
+    reference_sql: |
+      SELECT o.status, COUNT(*) AS orders FROM orders AS o
+      WHERE o.created_at >= TIMESTAMP '2023-01-01 00:00:00' AND o.created_at < TIMESTAMP '2024-01-01 00:00:00'
+      GROUP BY o.status
+  - id: g025
+    question: Average number of items per order
+    intent: analytics
+    difficulty: easy
+    tags: [orders]
+    expected_tables: [orders]
+    reference_sql: |
+      SELECT AVG(o.num_of_item) AS avg_items_per_order FROM orders AS o
+  - id: g026
+    question: Units in stock by product category group
+    intent: analytics
+    difficulty: medium
+    tags: [inventory, join]
+    expected_tables: [inventory_items, products]
+    reference_sql: |
+      SELECT p.category_group, COUNT(*) AS units_in_stock
+      FROM inventory_items AS ii JOIN products AS p ON ii.product_id = p.id
+      WHERE ii.sold_at IS NULL GROUP BY p.category_group
+  - id: g027
+    question: Show a chart of yearly net revenue by department
+    intent: analytics
+    difficulty: hard
+    tags: [revenue, time-series, chart, join]
+    wants_chart: true
+    expected_tables: [order_items, products]
+    expected_metric: net_revenue
+    reference_sql: |
+      SELECT year(oi.created_at) AS year, p.department,
+             SUM(CASE WHEN oi.status NOT IN ('Cancelled', 'Returned') THEN oi.sale_price ELSE 0 END) AS net_revenue
+      FROM order_items AS oi JOIN products AS p ON oi.product_id = p.id
+      GROUP BY 1, 2
+  - id: g028
+    question: Average retail price by product category group, excluding test prices
+    intent: analytics
+    difficulty: medium
+    tags: [pricing, data-quality]
+    expected_tables: [products]
+    reference_sql: |
+      SELECT p.category_group, AVG(p.retail_price) AS avg_retail_price
+      FROM products AS p WHERE NOT p.is_test_price GROUP BY p.category_group
+  - id: g029
+    question: Gross revenue including returns and cancellations in 2021
+    intent: analytics
+    difficulty: medium
+    tags: [revenue, metric, time-filter]
+    expected_tables: [order_items]
+    expected_metric: gross_revenue
+    reference_sql: |
+      SELECT SUM(oi.sale_price) AS gross_revenue FROM order_items AS oi
+      WHERE oi.created_at >= TIMESTAMP '2021-01-01 00:00:00' AND oi.created_at < TIMESTAMP '2022-01-01 00:00:00'
+  - id: g030
+    question: Number of products in each department
+    intent: analytics
+    difficulty: easy
+    tags: [catalog]
+    expected_tables: [products]
+    reference_sql: |
+      SELECT p.department, COUNT(*) AS products FROM products AS p GROUP BY p.department
+  # --- routing cases (no SQL) -----------------------------------------------------------
+  - id: r001
+    question: How are we doing?
+    intent: ambiguous
+    difficulty: easy
+    tags: [routing, clarify]
+  - id: r002
+    question: Who are our best customers?
+    intent: ambiguous
+    difficulty: easy
+    tags: [routing, clarify]
+  - id: r003
+    question: What will the weather be in Pune tomorrow?
+    intent: out_of_scope
+    difficulty: easy
+    tags: [routing]
+  - id: r004
+    question: Write me a Python function to reverse a string
+    intent: out_of_scope
+    difficulty: easy
+    tags: [routing]
+  - id: r005
+    question: Hello there
+    intent: small_talk
+    difficulty: easy
+    tags: [routing]

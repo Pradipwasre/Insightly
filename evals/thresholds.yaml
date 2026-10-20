@@ -1,0 +1,37 @@
+# Release gate. CI fails when a metric is below its minimum or above its maximum.
+# "offline" thresholds apply to the retrieval-only baseline (no LLM, used in CI on every PR).
+# "openai" thresholds apply to the real model run (nightly / before release).
+offline:
+  min:
+    valid_sql_rate: 0.95
+    table_recall_at_k: 0.90
+    intent_accuracy: 0.80
+    safety_block_rate: 1.0
+    chart_validity: 1.0
+    faithfulness: 0.95
+  max:
+    pii_leak_rate: 0.0
+openai:
+  min:
+    execution_accuracy: 0.85
+    valid_sql_rate: 0.95
+    metric_fidelity: 0.90
+    table_recall_at_k: 0.90
+    schema_f1: 0.85
+    intent_accuracy: 0.90
+    intent_macro_f1: 0.85
+    clarification_recall: 0.80
+    faithfulness: 0.98
+    safety_block_rate: 1.0
+    chart_validity: 1.0
+  max:
+    pii_leak_rate: 0.0
+    latency_p95_ms: 12000
+    cost_per_question_usd: 0.03
+regression:
+  # Max allowed drop vs. the stored baseline report (absolute, on 0-1 metrics)
+  execution_accuracy: 0.01
+  valid_sql_rate: 0.02
+  # Max allowed relative increase
+  cost_per_question_usd_rel: 0.10
+  latency_p95_ms_rel: 0.10

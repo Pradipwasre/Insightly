@@ -1,0 +1,118 @@
+# Curated tables the agent may query (Glue database: insightly_curated, Iceberg).
+# Owned by the data team. Changes go through pull request review like code.
+version: 3
+tables:
+  - name: distribution_centers
+    description: Warehouse master data. 10 US distribution centers.
+    grain: one row per distribution center
+    columns:
+      id: {type: bigint, description: distribution center id 1-10, key: primary}
+      name: {type: string, description: "city and state label, e.g. 'Memphis TN', 'Chicago IL'"}
+      latitude: {type: double, description: latitude}
+      longitude: {type: double, description: longitude}
+
+  - name: products
+    description: Product catalog for women's and men's apparel.
+    grain: one row per product
+    columns:
+      id: {type: bigint, key: primary}
+      cost: {type: double, description: acquisition cost in USD}
+      category: {type: string, description: "raw category label, 26 values"}
+      category_group: {type: string, description: "category with duplicates merged (Socks & Hosiery -> Socks, Pants & Capris -> Pants, Suits & Sport Coats -> Suits). Prefer this for reporting."}
+      name: {type: string, description: product name}
+      brand: {type: string, description: brand name}
+      retail_price: {type: double, description: list selling price in USD}
+      department: {type: string, description: "'Women' or 'Men'"}
+      sku: {type: string, description: 32-char hash}
+      distribution_center_id: {type: bigint, description: home distribution center, references: distribution_centers.id}
+      is_test_price: {type: boolean, description: "true for dirty test rows priced under $1. Exclude from price analysis."}
+
+  - name: users
+    description: Customer profiles with PII removed (names, email, address and coordinates live in a restricted table the agent cannot read).
+    grain: one row per customer
+    columns:
+      id: {type: bigint, key: primary}
+      age: {type: bigint, description: age in years 12-70}
+      gender: {type: string, description: "'F' or 'M'"}
+      state: {type: string, description: state or province}
+      city: {type: string, description: city, can be null}
+      country: {type: string, description: "country name, e.g. 'China', 'United States', 'Brazil'"}
+      traffic_source: {type: string, description: "acquisition channel at signup: Search, Organic, Facebook, Email, Display"}
+      created_at: {type: timestamp, description: signup time UTC}
+
+  - name: orders
+    description: Orders placed by customers.
+    grain: one row per order
+    columns:
+      order_id: {type: bigint, key: primary}
+      user_id: {type: bigint, references: users.id}
+      status: {type: string, description: "Shipped, Complete, Processing, Cancelled, Returned"}
+      gender: {type: string, description: customer gender copied from users}
+      created_at: {type: timestamp, description: order time UTC}
+      returned_at: {type: timestamp, description: null when not returned}
+      shipped_at: {type: timestamp, description: null when not shipped}
+      delivered_at: {type: timestamp, description: null when not delivered}
+      num_of_item: {type: bigint, description: items in the order 1-4}
+
+  - name: order_items
+    description: Line items. The source of revenue. Item status can differ from the parent order status.
+    grain: one row per item sold
+    columns:
+      id: {type: bigint, key: primary}
+      order_id: {type: bigint, references: orders.order_id}
+      user_id: {type: bigint, references: users.id}
+      product_id: {type: bigint, references: products.id}
+      inventory_item_id: {type: bigint, references: inventory_items.id}
+      status: {type: string, description: "Shipped, Complete, Processing, Cancelled, Returned"}
+      created_at: {type: timestamp, description: sale time UTC}
+      shipped_at: {type: timestamp}
+      delivered_at: {type: timestamp}
+      returned_at: {type: timestamp}
+      sale_price: {type: double, description: price paid in USD}
+
+  - name: inventory_items
+    description: Physical stock units. sold_at is null while the unit is still in stock.
+    grain: one row per stock unit
+    columns:
+      id: {type: bigint, key: primary}
+      product_id: {type: bigint, references: products.id}
+      created_at: {type: timestamp, description: when the unit arrived in stock}
+      sold_at: {type: timestamp, description: null if unsold}
+      cost: {type: double, description: unit cost in USD}
+      product_category: {type: string}
+      product_name: {type: string}
+      product_brand: {type: string}
+      product_retail_price: {type: double}
+      product_department: {type: string}
+      product_sku: {type: string}
+      product_distribution_center_id: {type: bigint, references: distribution_centers.id}
+
+  - name: events
+    description: Website clickstream. user_id is null for anonymous visitors.
+    grain: one row per page event
+    columns:
+      id: {type: bigint, key: primary}
+      user_id: {type: bigint, references: users.id}
+      sequence_number: {type: bigint, description: order of the event in the session}
+      session_id: {type: string}
+      created_at: {type: timestamp}
+      ip_address: {type: string}
+      city: {type: string}
+      state: {type: string}
+      postal_code: {type: string}
+      browser: {type: string, description: "Chrome, Safari, Firefox, IE, Other"}
+      traffic_source: {type: string, description: "raw web source: Email, Adwords, Facebook, YouTube, Organic"}
+      channel: {type: string, description: "traffic_source mapped to the users vocabulary (Adwords -> Search, YouTube -> Display)"}
+      uri: {type: string}
+      event_type: {type: string, description: "home, department, product, cart, purchase, cancel"}
+
+joins:
+  - [order_items.product_id, products.id]
+  - [order_items.order_id, orders.order_id]
+  - [order_items.user_id, users.id]
+  - [order_items.inventory_item_id, inventory_items.id]
+  - [orders.user_id, users.id]
+  - [products.distribution_center_id, distribution_centers.id]
+  - [inventory_items.product_id, products.id]
+  - [inventory_items.product_distribution_center_id, distribution_centers.id]
+  - [events.user_id, users.id]

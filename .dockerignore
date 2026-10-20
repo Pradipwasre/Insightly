@@ -1,0 +1,8 @@
+.venv
+.git
+data
+reports
+.cache
+infra/cdk.out
+**/__pycache__
+.env

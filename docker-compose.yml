@@ -1,0 +1,42 @@
+# Local production-like stack: Postgres + pgvector (checkpoints, vectors), API, UI.
+# Data is read from ./data/curated through DuckDB (Athena is used on AWS).
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: insightly
+      POSTGRES_PASSWORD: insightly
+      POSTGRES_DB: insightly
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insightly"]
+      interval: 5s
+      retries: 10
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      INSIGHTLY_VECTOR_STORE: pgvector
+      INSIGHTLY_CHECKPOINTER: postgres
+      INSIGHTLY_DATABASE_URL: postgresql://insightly:insightly@db:5432/insightly
+      INSIGHTLY_CURATED_DIR: /app/data/curated
+      INSIGHTLY_CORS_ORIGINS: '["http://localhost:8501"]'
+    volumes: ["./data:/app/data"]
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  ui:
+    image: python:3.12-slim
+    working_dir: /ui
+    command: sh -c "pip install -q streamlit==1.66.0 plotly==7.1.0 httpx==0.28.1 && streamlit run streamlit_app.py --server.address 0.0.0.0"
+    environment:
+      INSIGHTLY_API_URL: http://api:8000
+    volumes: ["./ui:/ui"]
+    ports: ["8501:8501"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
